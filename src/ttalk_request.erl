@@ -8,9 +8,15 @@
 %%
 %% Tests
 %%
-%% -ifdef(TEST).
+-ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
 tokenize_test() ->
 	io:format("abc~n"),
 	?_assertEqual(2,3).
+
+tmp_test() ->
+	io:format("abc~n"),
+	?_assertEqual(2,3).
+
+-endif.
