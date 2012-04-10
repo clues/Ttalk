@@ -7,13 +7,7 @@
 all() ->
 	all(file:get_cwd()).
 all(Project) ->
-%% 	if 
-%% 		is_list(Project) ->
-%% 			erlang:cd(Project);
-%% 		true ->
-%% 			erlang:cd(atom_to_list(Project))
-%% 	end,
-	{ok,FileNames} = file:list_dir("."),
+	{ok,FileNames} = file:list_dir(Project),
 	Mods = getModeNames(FileNames,[]),
 	[t(Mod) || Mod <- Mods].
 
@@ -25,7 +19,7 @@ t(Mod,Fun) ->
 	Mod:Fun().
 
 getAllTestFunction(Mod) ->
-	io:format("pwd: ~p",[erlang:pwd()]),
+	io:format("pwd: ~p~n",[file:get_cwd()]),
 	Functions = Mod:module_info(functions),
 	[X || {X,ArgsNum} <- Functions,ArgsNum=:=0,
 		  lists:sublist(atom_to_list(X),4) =:= "test"].
@@ -33,12 +27,12 @@ getAllTestFunction(Mod) ->
 getModeNames([],L)->
 	L;
 getModeNames([H|T],L) ->
-	FnStr = atom_to_list(H),
+	FnStr = H,
 	IsBeam = lists:suffix(".beam", FnStr),
 	if 
 		 IsBeam ->
-			Mod = lists:sublist(FnStr,0, (length(FnStr)-5)),
-			getModeNames(T,[Mod|L]);
+			Mod = lists:sublist(FnStr,1, (length(FnStr)-5)),
+			getModeNames(T,[list_to_atom(Mod)|L]);
 		 true ->
 			getModeNames(T,[L])
 	end.

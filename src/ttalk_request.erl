@@ -4,19 +4,22 @@
 -module(ttalk_request).
 -export([]).
 
+removeHeadSpace() ->
+	<<H|Rest>> = Bin,
+	if
+		H =:= 32 ->
+			removeHeadSpace(Bin);
+		true ->
+			<<H|Bin>>
+	end.
+
+
 
 %%
 %% Tests
 %%
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
-tokenize_test() ->
-	io:format("abc~n"),
-	?_assertEqual(2,3).
-
-tmp_test() ->
-	io:format("abc~n"),
-	?_assertEqual(2,3).
-
+removeHeadSpace_test() ->
+	?assertEqual(<<"-help">>,removeHeadSpace(<<"  -help">>)).
 -endif.
