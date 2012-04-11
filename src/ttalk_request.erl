@@ -1,8 +1,9 @@
 %% Author: wave
 %% Created: 2012-4-6
-%% Description: TODO: Add description to ttalk_request
+%% Description:ttalk_request,this module The main purpose of packt
+%% original information from client
 -module(ttalk_request).
--export([]).
+-export([getLine/1]).
 -include("ttalk_cmd.hrl").
 
 removeHeadSpace([]) ->
@@ -28,18 +29,22 @@ parseCmd(Line,Cmd,Data) ->
 			parseCmd([],Cmd,Line)
 	end.
 
+-spec getLine(RawLine::string()) ->term().
+getLine(RawLine) ->
+	parseLine(RawLine,[],[]).
+
 parseLine([],Cmd,Data) ->
 	#line{};
-parseLine(Line,Cmd,Data) ->
-	Line1 = removeHeadSpace(Line),
-	[H|T] = Line1,
+parseLine(RawLine,Cmd,Data) ->
+	RawLine1 = removeHeadSpace(RawLine),
+	[H|T] = RawLine1,
 	if
 		H =:= [] ->
 			#line{};
 		H =:= $- ->
 			parseCmd(T,[],[]);
 		true ->
-			#line{data=Line}
+			#line{data=RawLine}
 	end.
 
 get_cmd(Cmd) ->
@@ -50,6 +55,8 @@ get_cmd(Cmd) ->
 			{ok,?CMD_HELP};
 		Cmd =:= ?CMD_LOGIN ->
 			{ok,?CMD_LOGIN};
+		Cmd =:= ?CMD_HISTORY ->
+			{ok,?CMD_HISTORY};
 		true ->
 			{none,Cmd}
 	end.
@@ -74,33 +81,19 @@ check_cmd_format(Line) ->
 		true ->
 			if
 				Line#line.cmd =:= ?CMD_HELP ->
-					format_0(Line);
+					format(Line,0);
 				Line#line.cmd =:= ?CMD_LOGIN ->
-					format_1(Line)
+					format(Line,1);
+				Line#line.cmd =:= ?CMD_HISTORY ->
+					format(Line,2)
 			end
 	end.
 
-format_0(Line) ->
-	if
-		length(Line#line.data) =/= 0 ->
-			#line{cmd=Line#line.cmd,data=Line#line.data,state=?CODE_CMD_FORMAT_ERROR};
-		true ->
-			Line
-	end.
 
-format_1(Line) ->
-	Tokens = string:tokens(Line," "),
-	if
-		length(Tokens) =/= 1 ->
-			#line{cmd=Line#line.cmd,data=Line#line.data,state=?CODE_CMD_FORMAT_ERROR};
-		true ->
-			#line{cmd=Line#line.cmd,data=Tokens}
-	end.
-
-format_2(Line) ->
+format(Line,ArgsNum) ->
 	Tokens = string:tokens(Line#line.data," "),
 	if
-		length(Tokens) =/= 2 ->
+		length(Tokens) =/= ArgsNum ->
 			#line{cmd=Line#line.cmd,data=Line#line.data,state=?CODE_CMD_FORMAT_ERROR};
 		true ->
 			#line{cmd=Line#line.cmd,data=Tokens}
@@ -119,20 +112,25 @@ removeHeadSpace_test() ->
 	?assertEqual("-login abc",removeHeadSpace("  -login abc")).
 
 parseLine_null_test() ->
-	?assertEqual(#line{},parseLine("",[],[])).
+	?assertEqual(#line{},getLine("")).
 
 parseLine_without_cmd_test() ->
-	?assertEqual(#line{data="  hello,world"},parseLine("  hello,world",[],[])).
+	?assertEqual(#line{data="  hello,world"},getLine("  hello,world")).
 
 parseLine_with_cmd_test() ->
-	?assertEqual(#line{cmd="login",data="   jias"},parseLine(" -login   jias",[],[])).
+	?assertEqual(#line{cmd="login",data=["jias"]},getLine(" -login   jias")).
 
-fliter_cmd_with_cmd_test() ->
-	?assertEqual(#line{cmd="login",data="   jias"},parseLine(" -login   jias",[],[])).
 fliter_cmd_with_undefined_cmd_test() ->
-	?assertEqual(#line{cmd='undefined',data="-loginlogin   jias"},parseLine(" -loginlogin   jias",[],[])).
+	?assertEqual(#line{cmd='undefined',data="-loginlogin   jias"},getLine(" -loginlogin   jias")).
 fliter_cmd_with_cmd_flag_test() ->
-	?assertEqual(#line{cmd='undefined',data="- "},parseLine(" - ",[],[])).
-format_cmd_ok_test() ->
-	?assertEqual(#line{cmd='login',data="jias"},parseLine("-login jias",[],[])).
+	?assertEqual(#line{cmd='undefined',data="- "},getLine(" - ")).
+format_cmd_0_ok_test() ->
+	?assertEqual(#line{cmd="help",data=[]},getLine(" -help ")).
+format_cmd_1_ok_test() ->
+	?assertEqual(#line{cmd="login",data=["jias"]},getLine("-login jias")).
+format_cmd_2_ok_test() ->
+	?assertEqual(#line{cmd="history",data=["2","3"]},getLine("-history 2 3")).
+format_cmd_state_error_test() ->
+	?assertEqual(#line{cmd="login",data=" jias chao",state=?CODE_CMD_FORMAT_ERROR},getLine("-login jias chao")).
+
 -endif.
