@@ -8,93 +8,70 @@
 
 removeHeadSpace([]) ->
 	[];
-removeHeadSpace([H|T]) ->
-	if
-		H =:= $\s ->
-			removeHeadSpace(T);
-		true ->
-			[H|T]
-	end.
+removeHeadSpace([H|T]) when H =:= $\s ->
+	removeHeadSpace(T);
+removeHeadSpace(L) ->
+	L.
 
 parseCmd([],Cmd,Data) ->
 	Line = #line{cmd=lists:reverse(Cmd),data=Data},
-	fliter_cmd(Line);
+	fliter_cmd(Line,get_cmd(Line#line.cmd));
 
-parseCmd(Line,Cmd,Data) ->
-	[H|T] = Line,
-	if
-		H =/= $\s ->
-			parseCmd(T,[H|Cmd],Data);
-		true ->
-			parseCmd([],Cmd,Line)
-	end.
+parseCmd([H|T],Cmd,Data) when H =/= $\s ->
+	parseCmd(T,[H|Cmd],Data);
+
+parseCmd(RawLine,Cmd,Data) ->
+	parseCmd([],Cmd,RawLine).
 
 -spec getLine(RawLine::string()) ->term().
 getLine(RawLine) ->
-	parseLine(RawLine,[],[]).
+	parseLine(removeHeadSpace(RawLine),[],[]).
+
 
 parseLine([],Cmd,Data) ->
 	#line{};
-parseLine(RawLine,Cmd,Data) ->
-	RawLine1 = removeHeadSpace(RawLine),
-	[H|T] = RawLine1,
-	if
-		H =:= [] ->
-			#line{};
-		H =:= $- ->
-			parseCmd(T,[],[]);
-		true ->
-			#line{data=RawLine}
-	end.
-
-get_cmd(Cmd) ->
-	if 
-		Cmd =:= 'undefined' ->
-			'undefined';
-		Cmd =:= ?CMD_HELP ->
-			{ok,?CMD_HELP};
-		Cmd =:= ?CMD_LOGIN ->
-			{ok,?CMD_LOGIN};
-		Cmd =:= ?CMD_HISTORY ->
-			{ok,?CMD_HISTORY};
-		true ->
-			{none,Cmd}
-	end.
+parseLine([H|T],Cmd,Data) when H =:= [] ->
+	#line{};
+parseLine([H|T],Cmd,Data) when H =:= $- ->
+	parseCmd(T,[],[]);
+parseLine(TirmedLine,Cmd,Data) ->
+	#line{data=TirmedLine}.
 
 
-fliter_cmd(Line) ->
-	Cmd = get_cmd(Line#line.cmd),
-	case Cmd of
-		'undefined' ->
-			#line{cmd='undefined',data=Line#line.data};
-		{ok,C} ->
-			NewLine = #line{cmd=C,data=Line#line.data},
-			check_cmd_format(NewLine);
-		_ ->
-			#line{cmd='undefined',data=("-"++Line#line.cmd++Line#line.data)}
-	end.
+get_cmd(undefined) ->
+	undefined;
+get_cmd(?CMD_HELP) ->
+	?CMD_HELP;
+get_cmd(?CMD_LOGIN) ->
+	?CMD_LOGIN;
+get_cmd(?CMD_HISTORY) ->
+	?CMD_HISTORY;
+get_cmd(_Cmd) ->
+	unknowncmd.
 
+fliter_cmd(Line,Cmd) when Cmd == undefined ->
+	Line;
+fliter_cmd(Line,Cmd) when Cmd == unknowncmd ->
+	#line{cmd='unknowncmd',data=("-"++Line#line.cmd++Line#line.data)};
+fliter_cmd(Line,Cmd) ->
+	NewLine = #line{cmd=Cmd,data=Line#line.data},
+	check_cmd_format(NewLine).
+
+
+check_cmd_format(Line) when Line#line.cmd == ?CMD_HELP ->
+	format(Line,0);
+check_cmd_format(Line) when Line#line.cmd == ?CMD_LOGIN ->
+	format(Line,1);
+check_cmd_format(Line) when Line#line.cmd == ?CMD_HISTORY ->
+	format(Line,2);
 check_cmd_format(Line) ->
-	if
-		Line#line.cmd =:= 'undefined' ->
-			Line;
-		true ->
-			if
-				Line#line.cmd =:= ?CMD_HELP ->
-					format(Line,0);
-				Line#line.cmd =:= ?CMD_LOGIN ->
-					format(Line,1);
-				Line#line.cmd =:= ?CMD_HISTORY ->
-					format(Line,2)
-			end
-	end.
-
+	Line.
 
 format(Line,ArgsNum) ->
 	Tokens = string:tokens(Line#line.data," "),
 	if
 		length(Tokens) =/= ArgsNum ->
-			#line{cmd=Line#line.cmd,data=Line#line.data,state=?CODE_CMD_FORMAT_ERROR};
+			#line{cmd=Line#line.cmd,data=Line#line.data,state=?ERROR_CODE_CMD_FORMAT};
 		true ->
 			#line{cmd=Line#line.cmd,data=Tokens}
 	end.
@@ -113,17 +90,16 @@ removeHeadSpace_test() ->
 
 parseLine_null_test() ->
 	?assertEqual(#line{},getLine("")).
-
 parseLine_without_cmd_test() ->
-	?assertEqual(#line{data="  hello,world"},getLine("  hello,world")).
-
+	?assertEqual(#line{data="hello,world"},getLine("  hello,world")).
 parseLine_with_cmd_test() ->
 	?assertEqual(#line{cmd="login",data=["jias"]},getLine(" -login   jias")).
 
 fliter_cmd_with_undefined_cmd_test() ->
-	?assertEqual(#line{cmd='undefined',data="-loginlogin   jias"},getLine(" -loginlogin   jias")).
+	?assertEqual(#line{cmd='unknowncmd',data="-loginlogin   jias"},getLine(" -loginlogin   jias")).
 fliter_cmd_with_cmd_flag_test() ->
-	?assertEqual(#line{cmd='undefined',data="- "},getLine(" - ")).
+	?assertEqual(#line{cmd='unknowncmd',data="- "},getLine(" - ")).
+
 format_cmd_0_ok_test() ->
 	?assertEqual(#line{cmd="help",data=[]},getLine(" -help ")).
 format_cmd_1_ok_test() ->
@@ -131,6 +107,6 @@ format_cmd_1_ok_test() ->
 format_cmd_2_ok_test() ->
 	?assertEqual(#line{cmd="history",data=["2","3"]},getLine("-history 2 3")).
 format_cmd_state_error_test() ->
-	?assertEqual(#line{cmd="login",data=" jias chao",state=?CODE_CMD_FORMAT_ERROR},getLine("-login jias chao")).
+	?assertEqual(#line{cmd="login",data=" jias chao",state=?ERROR_CODE_CMD_FORMAT},getLine("-login jias chao")).
 
 -endif.
